@@ -243,6 +243,7 @@ public class Mov : MonoBehaviour
            if (!ReferenceEquals(obj.transform.gameObject,this.transform.gameObject) )
             {
                //Lerp the final position to  make smoother
+               //Ray-Box Intersection
                 Vector3 ray = (tpos - campos).normalized;
                 Vector3 mint  = (obj.collider.bounds.min - campos) ;
                 Vector3 maxt  = (obj.collider.bounds.max - campos) ;
