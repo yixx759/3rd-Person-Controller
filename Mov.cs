@@ -15,6 +15,20 @@ struct Rotaions
 
 }
 
+[Flags]
+enum MovementOptions
+{
+    dash = 1,
+    trujump = 1<<1,
+    trujumpenable = 1<<2,
+    onground = 1<<3,
+    onwall = 1<<4,
+    
+    
+    
+    
+}
+
 
 
 public class Mov : MonoBehaviour
@@ -47,8 +61,8 @@ public class Mov : MonoBehaviour
    [SerializeField] private float cayoteTime= 1;
    [SerializeField]private Transform cam;
    
-   
-   
+   //Might put in struct later
+   private MovementOptions Contorl = 0;
    private Vector3 vel = Vector3.zero;
    private Vector3 desiredvel;
    Vector3 tpos ;
@@ -60,21 +74,16 @@ public class Mov : MonoBehaviour
    private float ycam = 1;
    private float scayoteTime= 1;
   private float jumpforce2 = 2;
-  private bool jump = false;
-  private bool trujump = false;
-  private bool trujumpenable = false;
-  private bool onground = false;
-  private bool onwall = false;
   private float initalrun;
   private float walltimer = 0.4f;
   private float walltimercop = 0.4f;
-  private bool dash = false;
   private float dashcooldownCopy = 0f;
   private const float hpi = Mathf.PI / 2;
   private float speed2;
  private float JumpTimec = -1f;
  private float plottouse =0;
  private float dotimer = 0;
+
 
  
   float jumpvel =>  Mathf.Sqrt(-2f * Physics.gravity.y * jumpforce2);
@@ -141,10 +150,11 @@ public class Mov : MonoBehaviour
         
     if (Input.GetKeyDown(KeyCode.Space) )
     {
-        if (onwall && enableWallrun&&enableWallJump)
+        if (((Contorl & MovementOptions.onwall) == MovementOptions.onwall) && enableWallrun&&enableWallJump)
         {
-            trujump = true;
-            trujumpenable = true;
+            Contorl |= MovementOptions.trujump;
+            Contorl |= MovementOptions.trujumpenable;
+           
         }
 
 
@@ -162,7 +172,7 @@ public class Mov : MonoBehaviour
     {
         if (Input.GetMouseButtonDown(1) )
         {
-            dash = true;
+            Contorl |= MovementOptions.dash;
             dashcooldownCopy = dashshCooldown;
             
 
@@ -173,13 +183,14 @@ public class Mov : MonoBehaviour
     }
 
         //dont have to worry about underflow https://csharp.2000things.com/tag/overflow/#:~:text=When%20you%20perform%20an%20arithmetic,the%20maximum%20allowed%20exponent%20value.
-        if (trujumpenable)
+        if ((Contorl & MovementOptions.trujumpenable) != 0)
         {
             walltimercop -= Time.deltaTime;
      
         }
 
-        if (!onground)
+       
+        if ((Contorl & MovementOptions.onground) == 0)
         {
 
 
@@ -194,7 +205,7 @@ public class Mov : MonoBehaviour
         //Could use hermites curve
         if (dampYEnable)
         {
-            //
+            
             if (  vel.y > 0.01)
             {
                 dotimer += (time*time*time)*camfollowervalue1;
@@ -243,7 +254,6 @@ public class Mov : MonoBehaviour
            if (!ReferenceEquals(obj.transform.gameObject,this.transform.gameObject) )
             {
                //Lerp the final position to  make smoother
-               //Ray-Box Intersection
                 Vector3 ray = (tpos - campos).normalized;
                 Vector3 mint  = (obj.collider.bounds.min - campos) ;
                 Vector3 maxt  = (obj.collider.bounds.max - campos) ;
@@ -257,7 +267,7 @@ public class Mov : MonoBehaviour
             }
           
         }
-        
+       
     }
 
     private void OnCollisionEnter(Collision other)
@@ -265,7 +275,7 @@ public class Mov : MonoBehaviour
        //if floor the normal will point all the way up
         if (other.GetContact(0).normal.y > 0.9)
         {
-            onground = true;
+            Contorl |= MovementOptions.onground;
             scayoteTime = cayoteTime;
 
 
@@ -291,8 +301,8 @@ public class Mov : MonoBehaviour
         
         if(other.GetContact(0).normal.y < 0.1 &&  other.GetContact(0).normal.y > -0.1  && enableWallrun)
         {
-          
-            onwall = true;
+            
+           Contorl |= MovementOptions.onwall;
             wallrunnorm = other.GetContact(0).normal;
         }
 
@@ -307,25 +317,28 @@ public class Mov : MonoBehaviour
         if (walltimercop <= 0)
         {
             walltimercop = walltimer;
-            trujumpenable = false;
+            
+            Contorl &= ~MovementOptions.trujumpenable;
         }
     
        
         vel.x = Mathf.MoveTowards(vel.x, desiredvel.x, maxspeedchange * Time.deltaTime);
         vel.z = Mathf.MoveTowards(vel.z, desiredvel.z, maxspeedchange * Time.deltaTime);
         
-        if (onwall && trujump && enableWallrun)
+     
+       if (((Contorl & (MovementOptions.onwall | MovementOptions.trujump)) == (MovementOptions.onwall | MovementOptions.trujump) ) && enableWallrun)
         {
 
             //jump in opposite direction of wall plus a small jump
             vel += (wallrunnorm + new Vector3(0,0.6f,0))*walljump;
-          
-            trujump = false;
-    
+            
+          Contorl &= ~MovementOptions.trujump;
+
 
         }
         
-        else if (onwall && !trujumpenable && enableWallrun)
+   
+        else if ((Contorl & (MovementOptions.onwall | MovementOptions.trujumpenable))== (MovementOptions.onwall)&& enableWallrun)
         {
             
          
@@ -333,39 +346,36 @@ public class Mov : MonoBehaviour
         Vector3 dir = Vector3.Cross(cam.up, wallrunnorm)*wallspeed;
         dir = (Vector3.Dot(dir, transform.forward) > 0) ? dir : -dir;
         
-        
-        
-        
            vel = dir* initalrun ;
             vel.x += desiredvel.x* Time.deltaTime;
             vel.z += desiredvel.z* Time.deltaTime;
-      
-           
+
             Debug.DrawLine(transform.position, transform.position+vel*2, Color.green);
             
         }
-     
+       
         else if (JumpTimec >0 && scayoteTime>=0)
         {
-            
+           
             vel.y += jumpvel;
             scayoteTime = -1;
-            onground = false;
+            Contorl &= ~MovementOptions.onground;
             JumpTimec = 0;
 
         }
 
-        if (dash)
+      
+        if ((Contorl & MovementOptions.dash) !=0)
         {
            
             vel += transform.forward*dashspeed;
-            dash = false;
+            Contorl &= ~MovementOptions.dash;
+          
             dashcooldownCopy = 3f;
         }
 
-
-       
-        onwall = false;
+        print(Contorl);
+        Contorl &= ~MovementOptions.onwall;
         Debug.DrawLine(transform.position, transform.position+(wallrunnorm).normalized, Color.blue);
         movershaker.velocity = vel;
         
